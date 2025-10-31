@@ -1,0 +1,6 @@
+@echo off
+echo Ejecutando CambiadorDeFondo.exe...
+cd dist\CambiadorDeFondo
+start CambiadorDeFondo.exe
+echo.
+echo La aplicacion se esta ejecutando...
