@@ -1,0 +1,17 @@
+{
+    "mode": "time",
+    "interval": 30,
+    "wallpapers": [],
+    "use_folder": false,
+    "wallpaper_folder": "",
+    "weekday_wallpapers": {
+        "monday": "",
+        "tuesday": "",
+        "wednesday": "",
+        "thursday": "",
+        "friday": "",
+        "saturday": "",
+        "sunday": ""
+    },
+    "last_change": "Nunca"
+}

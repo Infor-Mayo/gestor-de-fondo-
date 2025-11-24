@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List, Optional, Callable
 
 from .config_manager import ConfigManager
+from .video_wallpaper import VideoWallpaperEngine
 
 
 class WallpaperEngine:
@@ -28,34 +29,81 @@ class WallpaperEngine:
         self.running = False
         self.thread = None
         self.countdown_callback = None
+        self.video_engine = VideoWallpaperEngine()
     
-    def set_wallpaper(self, image_path: str) -> bool:
+    def set_wallpaper(self, media_path: str) -> bool:
         """
-        Cambia el fondo de pantalla en Windows
+        Cambia el fondo de pantalla en Windows (imagen o video)
         
         Args:
-            image_path: Ruta a la imagen
+            media_path: Ruta a la imagen o video
             
         Returns:
             True si se cambió correctamente, False en caso contrario
         """
         try:
-            abs_path = os.path.abspath(image_path)
-            SPI_SETDESKWALLPAPER = 20
-            ctypes.windll.user32.SystemParametersInfoW(
-                SPI_SETDESKWALLPAPER, 
-                0, 
-                abs_path, 
-                3  # SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
-            )
-            return True
+            abs_path = os.path.abspath(media_path)
+            
+            # Verificar si es un video
+            if self.video_engine.is_video_file(abs_path):
+                # Detener cualquier video anterior
+                self.video_engine.stop_video_wallpaper()
+                # Establecer video como fondo
+                return self.video_engine.set_video_wallpaper(abs_path)
+            else:
+                # Detener video si hay uno reproduciéndose
+                if self.video_engine.is_playing():
+                    self.video_engine.stop_video_wallpaper()
+                
+                # Establecer imagen como fondo
+                SPI_SETDESKWALLPAPER = 20
+                ctypes.windll.user32.SystemParametersInfoW(
+                    SPI_SETDESKWALLPAPER, 
+                    0, 
+                    abs_path, 
+                    3  # SPIF_UPDATEINIFILE | SPIF_SENDCHANGE
+                )
+                return True
         except Exception as e:
             print(f"Error cambiando fondo: {e}")
             return False
     
+    def get_media_from_folder(self, folder_path: Optional[str] = None) -> List[str]:
+        """
+        Obtiene todas las imágenes y videos de una carpeta
+        
+        Args:
+            folder_path: Ruta de la carpeta. Si es None, usa la configurada
+            
+        Returns:
+            Lista de rutas de imágenes y videos
+        """
+        if folder_path is None:
+            folder_path = self.config_manager.get("wallpaper_folder")
+        
+        if not folder_path or not os.path.exists(folder_path):
+            return []
+        
+        # Extensiones válidas para imágenes y videos
+        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
+        video_extensions = {'.mp4', '.avi', '.mov', '.wmv', '.mkv', '.flv', '.webm', '.m4v'}
+        valid_extensions = image_extensions | video_extensions
+        
+        media_files = []
+        
+        try:
+            for file in os.listdir(folder_path):
+                if Path(file).suffix.lower() in valid_extensions:
+                    full_path = os.path.join(folder_path, file)
+                    media_files.append(full_path)
+        except Exception as e:
+            print(f"Error leyendo carpeta: {e}")
+        
+        return sorted(media_files)
+    
     def get_images_from_folder(self, folder_path: Optional[str] = None) -> List[str]:
         """
-        Obtiene todas las imágenes de una carpeta
+        Obtiene todas las imágenes de una carpeta (mantiene compatibilidad)
         
         Args:
             folder_path: Ruta de la carpeta. Si es None, usa la configurada
@@ -84,13 +132,13 @@ class WallpaperEngine:
     
     def get_wallpaper_list(self) -> List[str]:
         """
-        Obtiene la lista de fondos según la configuración
+        Obtiene la lista de fondos según la configuración (imágenes y videos)
         
         Returns:
             Lista de rutas de fondos
         """
         if self.config_manager.get("use_folder", False):
-            return self.get_images_from_folder()
+            return self.get_media_from_folder()
         else:
             return self.config_manager.get("wallpapers", [])
     
@@ -222,6 +270,9 @@ class WallpaperEngine:
         self.running = False
         if self.thread:
             self.thread.join(timeout=2)
+        # Detener cualquier video que esté reproduciéndose
+        if self.video_engine.is_playing():
+            self.video_engine.stop_video_wallpaper()
     
     def _monitor_loop(self) -> None:
         """Loop principal de monitoreo"""

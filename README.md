@@ -4,7 +4,7 @@
 
 ![Icon](assets/icon_64.png)
 
-**Aplicación Windows para cambiar fondos de pantalla automáticamente**
+**Aplicación Windows para cambiar fondos de pantalla automáticamente (imágenes y videos)**
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-CC%20BY--NC%204.0-red.svg)](LICENSE)
@@ -27,6 +27,9 @@ Aplicación de escritorio para Windows que cambia automáticamente el fondo de p
 - 🌓 **Modo Claro/Oscuro** con detección automática
 - ⏱️ **Contador Regresivo** en tiempo real
 - 📁 **Carpeta Persistente** para fondos
+- 🖼️ **Soporte de Imágenes** (JPG, PNG, BMP)
+- 🎬 **Soporte de Videos** (MP4, AVI, MOV, WMV, MKV, etc.)
+- 🖱️ **Drag & Drop** - Arrastra archivos directamente
 - 🔔 **Bandeja del Sistema** con notificaciones
 - 🚀 **Inicio Automático** con Windows
 - 🔧 **Arquitectura Modular** para fácil extensión
@@ -87,13 +90,31 @@ install.bat
 ### Modo Tiempo
 1. Selecciona "⏰ Cambiar cada cierto tiempo"
 2. Configura el intervalo en minutos
-3. Selecciona una carpeta con imágenes
+3. Agrega fondos de pantalla:
+   - **Carpeta**: Selecciona una carpeta con imágenes y/o videos
+   - **Lista Manual**: Usa el botón "➕ Agregar Imagen/Video"
+   - **Drag & Drop**: Arrastra archivos directamente desde el explorador
 4. ¡Listo! El contador mostrará el tiempo restante
 
 ### Modo Días
 1. Selecciona "📅 Cambiar según día de la semana"
-2. Asigna una imagen para cada día
+2. Asigna una imagen o video para cada día
 3. El fondo cambiará automáticamente cada día
+
+### 🖱️ Drag & Drop (Arrastrar y Soltar)
+- **Fácil de usar**: Arrastra archivos desde el Explorador de Windows
+- **Detección automática**: Reconoce imágenes y videos automáticamente
+- **Validación inteligente**: Solo acepta formatos soportados
+- **Feedback visual**: Indicadores claros durante el arrastre
+- **Sin duplicados**: Evita agregar archivos que ya están en la lista
+
+### 🎬 Formatos de Video Soportados
+- **MP4** - Formato más común y recomendado
+- **AVI** - Formato clásico de Windows
+- **MOV** - Formato de QuickTime
+- **WMV** - Formato nativo de Windows Media
+- **MKV** - Formato contenedor de alta calidad
+- **FLV, WEBM, M4V** - Formatos adicionales
 
 ## 📂 Estructura del Proyecto
 
@@ -132,6 +153,8 @@ Ver archivo [LICENSE](LICENSE) para detalles completos.
 - CustomTkinter por la UI moderna
 - pystray por la integración con system tray
 - darkdetect por la detección de tema
+- OpenCV por el procesamiento de videos
+- Pillow por el manejo de imágenes
 
 ---
 
