@@ -26,6 +26,12 @@ try:
 except ImportError:
     SYSTEM_TRAY_AVAILABLE = False
     print("[ADVERTENCIA] Sistema de bandeja del sistema no disponible")
+# Fallback tray simplificado
+try:
+    from .simple_tray import SimpleTrayManager
+    SIMPLE_TRAY_AVAILABLE = True
+except ImportError:
+    SIMPLE_TRAY_AVAILABLE = False
 from .startup_manager import StartupManager
 from .drag_drop_handler import DragDropHandler
 
@@ -435,47 +441,65 @@ class WallpaperChangerGUI:
         """Configura la pestaña de días de la semana"""
         ctk.CTkLabel(
             parent,
-            text="Asigna un fondo de pantalla para cada día de la semana:",
+            text="Configura múltiples imágenes o una carpeta por día y el intervalo de rotación:",
             font=ctk.CTkFont(size=14)
-        ).pack(pady=(10, 20))
+        ).pack(pady=(10, 10))
 
-        days = ["Lunes", "Martes", "Miércoles",
-                "Jueves", "Viernes", "Sábado", "Domingo"]
-        day_icons = ["📌", "📌", "📌", "📌", "📌", "🎉", "🎉"]
-        self.weekday_entries = {}
+        # Intervalo de rotación para modo día
+        interval_frame = ctk.CTkFrame(parent)
+        interval_frame.pack(fill='x', padx=20, pady=(0, 10))
+        ctk.CTkLabel(interval_frame, text="Intervalo (min) para rotación intra-día:").pack(side='left', padx=(10, 10))
+        self.weekday_rotation_var = tk.IntVar(value=self.config_manager.get("weekday_rotation_minutes", 30))
+        self.weekday_rotation_entry = ctk.CTkEntry(interval_frame, textvariable=self.weekday_rotation_var, width=80)
+        self.weekday_rotation_entry.pack(side='left')
 
-        for i, (day, icon) in enumerate(zip(days, day_icons)):
-            frame = ctk.CTkFrame(parent)
-            frame.pack(fill='x', padx=20, pady=5)
+        days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+        self.weekday_use_folder_vars = {}
+        self.weekday_folder_entries = {}
+        self.weekday_summary_labels = {}
+        self.weekday_selected_images = {}
 
-            ctk.CTkLabel(
-                frame,
-                text=f"{icon} {day}:",
-                width=120,
-                font=ctk.CTkFont(size=13)
-            ).pack(side='left', padx=15, pady=10)
+        for i, day in enumerate(days):
+            dkey = str(i)
+            self.weekday_selected_images[dkey] = []
 
-            entry = ctk.CTkEntry(
-                frame,
-                placeholder_text="Selecciona una imagen..."
-            )
-            entry.pack(side='left', padx=(0, 10), fill='x', expand=True)
-            self.weekday_entries[str(i)] = entry
+            outer = ctk.CTkFrame(parent)
+            outer.pack(fill='x', padx=20, pady=8)
 
-            ctk.CTkButton(
-                frame,
-                text="📂 Seleccionar",
-                command=lambda d=str(i): self.select_weekday_wallpaper(d),
-                width=120
-            ).pack(side='left', padx=(0, 15))
+            # Encabezado y toggle
+            header = ctk.CTkFrame(outer, fg_color="transparent")
+            header.pack(fill='x')
+            ctk.CTkLabel(header, text=f"📅 {day}", font=ctk.CTkFont(size=13, weight="bold"), width=120).pack(side='left', padx=(10, 10))
+            self.weekday_use_folder_vars[dkey] = tk.BooleanVar(value=False)
+            ctk.CTkCheckBox(
+                header,
+                text="Usar carpeta",
+                variable=self.weekday_use_folder_vars[dkey],
+                command=lambda d=dkey: self.on_day_use_folder_toggle(d)
+            ).pack(side='left')
 
+            # Selector de carpeta
+            folder_row = ctk.CTkFrame(outer, fg_color="transparent")
+            folder_row.pack(fill='x', pady=(6, 4))
+            self.weekday_folder_entries[dkey] = ctk.CTkEntry(folder_row, placeholder_text="Selecciona una carpeta de imágenes…")
+            self.weekday_folder_entries[dkey].pack(side='left', fill='x', expand=True, padx=(10, 10))
+            ctk.CTkButton(folder_row, text="📁 Carpeta", width=120, command=lambda d=dkey: self.select_weekday_folder(d)).pack(side='left', padx=(0, 10))
+
+            # Selector de múltiples imágenes
+            actions = ctk.CTkFrame(outer, fg_color="transparent")
+            actions.pack(fill='x')
+            ctk.CTkButton(actions, text="➕ Agregar imágenes", command=lambda d=dkey: self.select_weekday_images(d), width=160).pack(side='left', padx=(10, 10))
+            self.weekday_summary_labels[dkey] = ctk.CTkLabel(actions, text="0 imágenes")
+            self.weekday_summary_labels[dkey].pack(side='left')
+
+        # Botón guardar
         ctk.CTkButton(
             parent,
             text="💾 Guardar Configuración de Días",
             command=self.save_weekday_config,
             height=40,
             font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(pady=20)
+        ).pack(pady=15)
 
     def setup_startup_tab(self, parent) -> None:
         """Configura la pestaña de inicio automático"""
@@ -529,11 +553,47 @@ class WallpaperChangerGUI:
 
     def load_current_config(self) -> None:
         """Carga la configuración actual en la interfaz"""
-        # Cargar fondos por día
-        weekday_wallpapers = self.config_manager.get("weekday_wallpapers", {})
-        for day, wallpaper in weekday_wallpapers.items():
-            if wallpaper:
-                self.weekday_entries[day].insert(0, wallpaper)
+        # Rotación intra-día
+        rotation = self.config_manager.get("weekday_rotation_minutes", 30)
+        if hasattr(self, "weekday_rotation_var"):
+            try:
+                self.weekday_rotation_var.set(int(rotation))
+            except:
+                self.weekday_rotation_var.set(30)
+
+        # Cargar playlists por día con compatibilidad legacy
+        playlists = self.config_manager.get("weekday_playlists", {})
+        legacy = self.config_manager.get("weekday_wallpapers", {})
+
+        for i in range(7):
+            key = str(i)
+            use_folder = False
+            folder = ""
+            images = []
+
+            if key in playlists:
+                data = playlists.get(key) or {}
+                use_folder = bool(data.get("use_folder", False))
+                folder = data.get("folder") or ""
+                images = data.get("images") or []
+            else:
+                # Fallback legacy: una sola imagen por día
+                path = legacy.get(key)
+                if path:
+                    images = [path]
+
+            # Poblar UI
+            if hasattr(self, "weekday_use_folder_vars") and key in self.weekday_use_folder_vars:
+                self.weekday_use_folder_vars[key].set(use_folder)
+            if hasattr(self, "weekday_folder_entries") and key in self.weekday_folder_entries:
+                entry = self.weekday_folder_entries[key]
+                entry.delete(0, tk.END)
+                if folder:
+                    entry.insert(0, folder)
+            if hasattr(self, "weekday_selected_images"):
+                self.weekday_selected_images[key] = images
+            if hasattr(self, "weekday_summary_labels") and key in self.weekday_summary_labels:
+                self.weekday_summary_labels[key].configure(text=f"{len(images)} imágenes")
 
         # Configurar estado inicial del botón
         if self.config_manager.get("mode") == "weekday":
@@ -541,7 +601,7 @@ class WallpaperChangerGUI:
         else:
             self.change_now_button.configure(state="normal")
 
-        # Cargar lista de fondos
+        # Cargar lista de fondos (modo tiempo)
         self.refresh_wallpaper_list()
 
     def on_mode_change(self) -> None:
@@ -907,34 +967,64 @@ class WallpaperChangerGUI:
             print(f"Error eliminando archivo: {e}")
             messagebox.showerror("Error", f"Error eliminando archivo: {e}")
 
-    def select_weekday_wallpaper(self, day: str) -> None:
-        """Selecciona un fondo para un día específico"""
-        file = filedialog.askopenfilename(
-            title=f"Seleccionar fondo (imagen o video) para el día",
+    def on_day_use_folder_toggle(self, day: str) -> None:
+        """Actualiza el resumen al alternar 'Usar carpeta'"""
+        self.update_day_summary(day)
+
+    def update_day_summary(self, day: str) -> None:
+        count = len(self.weekday_selected_images.get(day, []))
+        self.weekday_summary_labels[day].configure(text=f"{count} imágenes")
+
+    def select_weekday_folder(self, day: str) -> None:
+        """Selecciona una carpeta de imágenes para un día"""
+        folder = filedialog.askdirectory(title="Seleccionar carpeta de imágenes para el día")
+        if folder:
+            self.weekday_folder_entries[day].delete(0, tk.END)
+            self.weekday_folder_entries[day].insert(0, folder)
+            self.weekday_use_folder_vars[day].set(True)
+            self.update_day_summary(day)
+
+    def select_weekday_images(self, day: str) -> None:
+        """Agrega múltiples imágenes para un día"""
+        files = filedialog.askopenfilenames(
+            title="Seleccionar imágenes para el día",
             filetypes=[
                 ("Imágenes", "*.jpg *.jpeg *.png *.bmp"),
-                ("Videos", "*.mp4 *.avi *.mov *.wmv *.mkv *.flv *.webm *.m4v"),
-                ("Imágenes y Videos",
-                 "*.jpg *.jpeg *.png *.bmp *.mp4 *.avi *.mov *.wmv *.mkv *.flv *.webm *.m4v"),
                 ("Todos los archivos", "*.*")
             ]
         )
-
-        if file:
-            self.weekday_entries[day].delete(0, tk.END)
-            self.weekday_entries[day].insert(0, file)
+        if not files:
+            return
+        current = self.weekday_selected_images.get(day, [])
+        added = [f for f in files if f not in current]
+        self.weekday_selected_images[day] = current + added
+        # Al agregar imágenes, priorizamos lista manual
+        self.weekday_use_folder_vars[day].set(False)
+        self.update_day_summary(day)
+        messagebox.showinfo("Imágenes agregadas", f"Se agregaron {len(added)} imagen(es) al día.")
 
     def save_weekday_config(self) -> None:
-        """Guarda la configuración de días"""
-        weekday_wallpapers = {}
-        for day, entry in self.weekday_entries.items():
-            value = entry.get()
-            weekday_wallpapers[day] = value if value else None
+        """Guarda la configuración de playlists por día y el intervalo"""
+        playlists = {}
+        legacy = {}
+        for i in range(7):
+            key = str(i)
+            use_folder = bool(self.weekday_use_folder_vars[key].get())
+            folder = self.weekday_folder_entries[key].get().strip()
+            images = self.weekday_selected_images.get(key, [])
+            playlists[key] = {
+                "use_folder": use_folder,
+                "folder": folder if folder else None,
+                "images": images
+            }
+            # Compatibilidad legacy: una imagen por día cuando no se usa carpeta
+            legacy[key] = images[0] if (images and not use_folder) else None
 
-        self.config_manager.set("weekday_wallpapers", weekday_wallpapers)
+        self.config_manager.set("weekday_playlists", playlists)
+        self.config_manager.set("weekday_rotation_minutes", int(self.weekday_rotation_var.get()))
+        self.config_manager.set("weekday_wallpapers", legacy)
         self.config_manager.save_config()
-        messagebox.showinfo(
-            "Guardado", "Configuración de días guardada correctamente")
+        messagebox.showinfo("Guardado", "Configuración de días guardada correctamente")
 
     def change_now(self) -> None:
         """Cambia el fondo inmediatamente"""
@@ -1054,6 +1144,25 @@ class WallpaperChangerGUI:
             # Iniciar el icono UNA SOLA VEZ al inicio
             self.tray_manager.setup()
             print("✅ System tray iniciado al arranque")
+        elif 'SIMPLE_TRAY_AVAILABLE' in globals() and SIMPLE_TRAY_AVAILABLE:
+            # Fallback cuando pystray no está disponible o falla la importación
+            self.tray_manager = SimpleTrayManager(
+                on_show=self.show_window,
+                on_quit=self.quit_app
+            )
+            self.tray_manager.setup()
+            # Enlazar acción de cambio ahora si es posible
+            try:
+                self.tray_manager.change_wallpaper = self.change_now_from_tray
+            except Exception:
+                pass
+            # Forzar visibilidad si el gestor lo soporta
+            if hasattr(self.tray_manager, 'set_visible'):
+                try:
+                    self.tray_manager.set_visible(True)
+                except Exception:
+                    pass
+            print("✅ System tray simple iniciado")
         else:
             self.tray_manager = None
 
@@ -1070,6 +1179,12 @@ class WallpaperChangerGUI:
     def hide_window(self) -> None:
         """Oculta la ventana principal"""
         self.root.withdraw()
+        # Asegurar visibilidad del icono en la bandeja si el gestor lo soporta
+        if self.tray_manager and hasattr(self.tray_manager, 'set_visible'):
+            try:
+                self.tray_manager.set_visible(True)
+            except Exception:
+                pass
 
     def change_now_from_tray(self, icon=None, item=None) -> None:
         """Cambia el fondo desde la bandeja"""
@@ -1091,19 +1206,22 @@ class WallpaperChangerGUI:
         self.root.after(0, self.root.destroy)
 
     def on_closing(self) -> None:
-        """Maneja el cierre de la aplicación - minimiza a bandeja"""
-        # Ocultar ventana CTk (el icono ya está corriendo desde el inicio)
-        self.hide_window()
-
-        # Notificar que la app sigue corriendo
+        """Maneja el cierre de la aplicación - minimiza a bandeja si disponible"""
         if self.tray_manager:
+            # Ocultar ventana CTk (el icono ya está corriendo desde el inicio)
+            self.hide_window()
+
+            # Notificar que la app sigue corriendo
             try:
                 self.tray_manager.notify(
                     "Aplicación minimizada",
                     "La aplicación sigue ejecutándose en segundo plano."
                 )
-            except:
+            except Exception:
                 pass
+        else:
+            # Si no hay bandeja disponible, cerrar completamente para evitar quedar "perdida"
+            self.quit_app()
 
     def setup_drag_drop(self) -> None:
         """Configura la funcionalidad de arrastrar y soltar"""

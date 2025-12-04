@@ -194,12 +194,51 @@ class WallpaperEngine:
             return datetime.now() - last_change_dt >= interval
         
         elif mode == "weekday":
+            # Si hay playlist por día, activar rotación intra-día
+            weekday = str(datetime.now().weekday())
+            playlists = self.config_manager.get("weekday_playlists", {})
+            day_conf = playlists.get(weekday, {"use_folder": False, "folder": None, "wallpapers": []})
+            
+            if day_conf.get("use_folder", False):
+                items = self.get_images_from_folder(day_conf.get("folder"))
+            else:
+                items = day_conf.get("wallpapers", [])
+            
             last_change = self.config_manager.get("last_change")
+            rotation = self.config_manager.get("weekday_rotation_minutes", 30)
+            rotation = rotation if isinstance(rotation, int) and rotation > 0 else 30
+            
+            # Si no hay items (playlist vacía), mantener comportamiento legacy: cambio solo por día
+            if not items:
+                if not last_change:
+                    return True
+                last_change_dt = datetime.fromisoformat(last_change)
+                return last_change_dt.date() != datetime.now().date()
+            
+            # Con playlist: cambiar cuando pasemos de un "slice" de minutos
             if not last_change:
                 return True
             
-            last_change_dt = datetime.fromisoformat(last_change)
-            return last_change_dt.date() != datetime.now().date()
+            try:
+                last_change_dt = datetime.fromisoformat(last_change)
+            except Exception:
+                return True
+            
+            now = datetime.now()
+            midnight_now = datetime.combine(now.date(), datetime.min.time())
+            midnight_last = datetime.combine(last_change_dt.date(), datetime.min.time())
+            
+            current_elapsed_minutes = int((now - midnight_now).total_seconds() // 60)
+            last_elapsed_minutes = int((last_change_dt - midnight_last).total_seconds() // 60)
+            
+            current_slice = current_elapsed_minutes // rotation
+            last_slice = last_elapsed_minutes // rotation
+            
+            # También forzar cambio si cambia el día
+            if last_change_dt.date() != now.date():
+                return True
+            
+            return current_slice != last_slice
         
         return False
     
@@ -215,7 +254,8 @@ class WallpaperEngine:
         if mode == "time":
             wallpaper = self.get_next_wallpaper_time_mode()
         else:
-            wallpaper = self.get_wallpaper_for_today()
+            # En modo día, usar playlist si existe; si no, fondo único legacy
+            wallpaper = self.get_next_wallpaper_weekday_mode()
         
         if wallpaper and os.path.exists(wallpaper):
             if self.set_wallpaper(wallpaper):
@@ -290,3 +330,31 @@ class WallpaperEngine:
                     self.countdown_callback(minutes, seconds)
             
             time.sleep(1)  # Verificar cada segundo para el contador
+    
+    def get_next_wallpaper_weekday_mode(self) -> Optional[str]:
+        """
+        Obtiene el fondo correcto para el día con rotación intra-día.
+        Si no hay playlist para el día, usa el fondo único legacy.
+        """
+        weekday = str(datetime.now().weekday())
+        playlists = self.config_manager.get("weekday_playlists", {})
+        day_conf = playlists.get(weekday, {"use_folder": False, "folder": None, "wallpapers": []})
+        
+        if day_conf.get("use_folder", False):
+            items = self.get_images_from_folder(day_conf.get("folder"))
+        else:
+            items = day_conf.get("wallpapers", [])
+        
+        if not items:
+            # Fallback legacy
+            weekday_wallpapers = self.config_manager.get("weekday_wallpapers", {})
+            return weekday_wallpapers.get(weekday)
+        
+        rotation = self.config_manager.get("weekday_rotation_minutes", 30)
+        rotation = rotation if isinstance(rotation, int) and rotation > 0 else 30
+        
+        now = datetime.now()
+        midnight = datetime.combine(now.date(), datetime.min.time())
+        elapsed_minutes = int((now - midnight).total_seconds() // 60)
+        slice_index = (elapsed_minutes // rotation) % len(items)
+        return items[slice_index]

@@ -9,10 +9,10 @@ dd_datas, dd_binaries, dd_hiddenimports = collect_all('darkdetect')
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['c:\\Users\\USUARIO\\Documents\\GitHub\\cambiador de fondo\\main.py'],
+    pathex=['c:\\Users\\USUARIO\\Documents\\GitHub\\cambiador de fondo'],
     binaries=pystray_binaries + ctk_binaries + dd_binaries,
-    datas=[('assets', 'assets')] + pystray_datas + ctk_datas + dd_datas,
+    datas=[('c:\\Users\\USUARIO\\Documents\\GitHub\\cambiador de fondo\\assets', 'assets')] + pystray_datas + ctk_datas + dd_datas,
     hiddenimports=['PIL._tkinter_finder', 'PIL.Image', 'PIL.ImageTk'] + pystray_hiddenimports + ctk_hiddenimports + dd_hiddenimports,
     hookspath=[],
     hooksconfig={},
@@ -42,7 +42,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets/icon.ico',
+    icon='c:\\Users\\USUARIO\\Documents\\GitHub\\cambiador de fondo\\assets\\icon.ico',
 )
 
 coll = COLLECT(

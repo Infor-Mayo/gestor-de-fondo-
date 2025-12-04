@@ -80,3 +80,32 @@ class SystemTrayManager:
     def update_title(self, text):
         if self.icon:
             self.icon.title = text
+
+    def update_countdown(self, minutes: int, seconds: int):
+        """
+        Actualiza el título del icono con el tiempo restante.
+        Llama mediante root.after para evitar problemas de threading.
+        """
+        if not self.icon:
+            return
+
+        try:
+            if minutes > 0:
+                text = f"{self.base_title} — Próximo cambio: {minutes}m {seconds}s"
+            else:
+                text = f"{self.base_title} — Próximo cambio: {seconds}s"
+
+            def do_update():
+                try:
+                    self.icon.title = text
+                except Exception:
+                    pass
+
+            try:
+                self.root.after(0, do_update)
+            except Exception:
+                # Si root no está disponible, intentamos directamente
+                do_update()
+        except Exception:
+            # Evitar que un fallo en bandeja detenga el hilo del motor
+            pass

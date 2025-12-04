@@ -1,12 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('modules', 'modules'), ('config.json', '.'), ('assets', 'assets')]
+binaries = []
+hiddenimports = ['tkinterdnd2', 'PIL', 'Pillow', 'cv2', 'numpy', 'customtkinter', 'darkdetect', 'pystray', 'PIL.Image', 'PIL.ImageTk', 'tkinter', 'tkinter.messagebox', 'tkinter.filedialog', 'winreg']
+tmp_ret = collect_all('customtkinter')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('pystray')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['main.py'],
+    ['C:\\Users\\USUARIO\\Documents\\GitHub\\cambiador de fondo\\main.py'],
     pathex=[],
-    binaries=[],
-    datas=[('modules', 'modules'), ('assets', 'assets'), ('config.json', '.')],
-    hiddenimports=['tkinterdnd2', 'PIL', 'PIL.Image', 'PIL.ImageTk', 'pystray', 'customtkinter', 'darkdetect', 'cv2', 'numpy'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -35,5 +44,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='assets\\icon.ico',
+    icon=['C:\\Users\\USUARIO\\Documents\\GitHub\\cambiador de fondo\\assets\\icon.ico'],
 )

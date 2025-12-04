@@ -33,6 +33,7 @@ class ConfigManager:
             "wallpapers": [],
             "wallpaper_folder": None,
             "use_folder": False,
+            # Compatibilidad: fondo único por día (legacy)
             "weekday_wallpapers": {
                 "0": None,  # Lunes
                 "1": None,  # Martes
@@ -42,6 +43,17 @@ class ConfigManager:
                 "5": None,  # Sábado
                 "6": None   # Domingo
             },
+            # Nuevo: playlist por día y rotación intra-día
+            "weekday_playlists": {
+                "0": {"use_folder": False, "folder": None, "wallpapers": []},
+                "1": {"use_folder": False, "folder": None, "wallpapers": []},
+                "2": {"use_folder": False, "folder": None, "wallpapers": []},
+                "3": {"use_folder": False, "folder": None, "wallpapers": []},
+                "4": {"use_folder": False, "folder": None, "wallpapers": []},
+                "5": {"use_folder": False, "folder": None, "wallpapers": []},
+                "6": {"use_folder": False, "folder": None, "wallpapers": []}
+            },
+            "weekday_rotation_minutes": 30,
             "last_change": None,
             "current_index": 0
         }
