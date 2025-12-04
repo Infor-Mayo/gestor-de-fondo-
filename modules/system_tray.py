@@ -17,26 +17,39 @@ class SystemTrayManager:
     def create_icon_image(self):
         try:
             import sys
-            # Detectar si estamos en EXE o script
+            # Resolver base según entorno (EXE vs script)
             if getattr(sys, 'frozen', False):
-                # Ejecutándose como EXE - usar sys._MEIPASS
-                icon_path = os.path.join(sys._MEIPASS, 'assets', 'icon_32.png')
-                print(f"[TRAY] Buscando icono en EXE: {icon_path}")
+                base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(__file__)))
+                print(f"[TRAY] Ejecutando como EXE. Base: {base_path}")
             else:
-                # Ejecutándose como script - subir dos niveles desde modules/ a la raíz
-                base_dir = os.path.dirname(os.path.dirname(__file__))
-                icon_path = os.path.join(base_dir, 'assets', 'icon_32.png')
-                print(f"[TRAY] Buscando icono en script: {icon_path}")
+                base_path = os.path.dirname(os.path.dirname(__file__))
+                print(f"[TRAY] Ejecutando como script. Base: {base_path}")
 
-            if os.path.exists(icon_path):
-                print(f"[TRAY] ✅ Icono encontrado: {icon_path}")
-                return PILImage.open(icon_path)
-            else:
-                print(f"[TRAY] ⚠️ Icono no encontrado: {icon_path}")
+            # Probar múltiples candidatos (preferir PNG 32x32 para pystray)
+            candidates = [
+                os.path.join(base_path, 'assets', 'icon_32.png'),
+                os.path.join(base_path, 'assets', 'icon.png'),
+                os.path.join(base_path, 'assets', 'icon.ico'),
+            ]
+
+            for icon_path in candidates:
+                print(f"[TRAY] Probando icono: {icon_path}")
+                if os.path.exists(icon_path):
+                    print(f"[TRAY] ✅ Icono encontrado: {icon_path}")
+                    img = PILImage.open(icon_path)
+                    try:
+                        # Normalizar a 32x32 RGBA para compatibilidad con bandeja
+                        img = img.convert('RGBA')
+                        if img.size != (32, 32):
+                            img = img.resize((32, 32), resample=0)
+                    except Exception:
+                        pass
+                    return img
+            print("[TRAY] ⚠️ Ningún icono encontrado en assets")
         except Exception as e:
             print(f"[TRAY] ⚠️ Error cargando icono: {e}")
 
-        # fallback: icono simple compatible 32x32
+        # Fallback: icono simple compatible 32x32
         print("[TRAY] Usando icono fallback generado")
         img = PILImage.new("RGB", (32, 32), "#2196F3")
         draw = ImageDraw.Draw(img)
@@ -64,7 +77,21 @@ class SystemTrayManager:
 
         self.icon = pystray.Icon(
             "CambiadorFondo", image, self.base_title, menu)
-        self.icon.run()
+        # Ejecutar el icono en modo detached para evitar bloqueo y mejorar aparición
+        try:
+            self.icon.run_detached()
+        except Exception:
+            # Fallback al modo normal
+            try:
+                self.icon.visible = True
+            except Exception:
+                pass
+            self.icon.run()
+        # Forzar visibilidad después de iniciar
+        try:
+            self.icon.visible = True
+        except Exception:
+            pass
 
     def setup(self):
         threading.Thread(target=self.crear_icono, daemon=True).start()

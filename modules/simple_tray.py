@@ -27,22 +27,32 @@ class SimpleTrayManager:
     def create_simple_icon(self):
         """Crea un icono simple"""
         try:
-            # Intentar cargar icono desde assets
+            import sys
+            # Determinar base
             if getattr(sys, 'frozen', False):
-                # EXE
-                icon_path = os.path.join(sys._MEIPASS, 'assets', 'icon_32.png')
+                base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(__file__)))
+                print(f"[TRAY-SIMPLE] Ejecutando como EXE. Base: {base_path}")
             else:
-                # Script
-                base_dir = os.path.dirname(os.path.dirname(__file__))
-                icon_path = os.path.join(base_dir, 'assets', 'icon_32.png')
-            
-            if os.path.exists(icon_path):
-                return PILImage.open(icon_path)
-        except:
-            pass
-        
+                base_path = os.path.dirname(os.path.dirname(__file__))
+                print(f"[TRAY-SIMPLE] Ejecutando como script. Base: {base_path}")
+
+            candidates = [
+                os.path.join(base_path, 'assets', 'icon.ico'),
+                os.path.join(base_path, 'assets', 'icon_32.png'),
+                os.path.join(base_path, 'assets', 'icon.png'),
+            ]
+            for icon_path in candidates:
+                print(f"[TRAY-SIMPLE] Probando icono: {icon_path}")
+                if os.path.exists(icon_path):
+                    return PILImage.open(icon_path)
+        except Exception as e:
+            print(f"[TRAY-SIMPLE] Error cargando icono: {e}")
+
         # Fallback: crear icono simple
-        return PILImage.new('RGB', (32, 32), color='#2196F3')
+        img = PILImage.new("RGB", (32, 32), "#2196F3")
+        draw = ImageDraw.Draw(img)
+        draw.ellipse((8, 8, 24, 24), fill="white")
+        return img
     
     def setup(self):
         """Configura el icono de bandeja"""
