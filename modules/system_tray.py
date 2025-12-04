@@ -68,9 +68,55 @@ class SystemTrayManager:
         def salir(icon, item):
             self.root.after(0, self.on_quit)
 
+        # Acciones adicionales del menú
+        def minimizar(icon, item):
+            try:
+                self.root.after(0, self.root.withdraw)
+            except Exception:
+                pass
+
+        def abrir_config(icon, item):
+            try:
+                import sys
+                base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(__file__))) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.dirname(__file__))
+                cfg = os.path.join(base_path, 'config.json')
+                if os.path.exists(cfg):
+                    os.startfile(cfg)
+                else:
+                    os.startfile(base_path)
+            except Exception:
+                pass
+
+        def habilitar_inicio(icon, item):
+            try:
+                from .startup_manager import StartupManager
+                ok, msg = StartupManager.enable()
+                try:
+                    self.notify("Inicio automático", msg)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+        def deshabilitar_inicio(icon, item):
+            try:
+                from .startup_manager import StartupManager
+                ok, msg = StartupManager.disable()
+                try:
+                    self.notify("Inicio automático", msg)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
         menu = pystray.Menu(
             pystray.MenuItem("Abrir", mostrar, default=True),
+            pystray.MenuItem("Minimizar Ventana", minimizar),
+            pystray.Menu.SEPARATOR,
             pystray.MenuItem("Cambiar Fondo Ahora", cambiar),
+            pystray.MenuItem("Abrir Configuración", abrir_config),
+            pystray.MenuItem("Habilitar inicio automático", habilitar_inicio),
+            pystray.MenuItem("Deshabilitar inicio automático", deshabilitar_inicio),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Salir", salir)
         )

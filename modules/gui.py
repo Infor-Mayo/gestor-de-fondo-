@@ -438,15 +438,19 @@ class WallpaperChangerGUI:
         ).pack(side='left', padx=5)
 
     def setup_weekday_tab(self, parent) -> None:
-        """Configura la pestaña de días de la semana"""
+        """Configura la pestaña de días de la semana con scroll"""
+        # Contenedor con scroll para evitar que los elementos se salgan de la ventana
+        scroll = ctk.CTkScrollableFrame(parent)
+        scroll.pack(fill='both', expand=True, padx=10, pady=(10, 10))
+
         ctk.CTkLabel(
-            parent,
+            scroll,
             text="Configura múltiples imágenes o una carpeta por día y el intervalo de rotación:",
             font=ctk.CTkFont(size=14)
-        ).pack(pady=(10, 10))
+        ).pack(pady=(0, 10))
 
         # Intervalo de rotación para modo día
-        interval_frame = ctk.CTkFrame(parent)
+        interval_frame = ctk.CTkFrame(scroll)
         interval_frame.pack(fill='x', padx=20, pady=(0, 10))
         ctk.CTkLabel(interval_frame, text="Intervalo (min) para rotación intra-día:").pack(side='left', padx=(10, 10))
         self.weekday_rotation_var = tk.IntVar(value=self.config_manager.get("weekday_rotation_minutes", 30))
@@ -463,7 +467,7 @@ class WallpaperChangerGUI:
             dkey = str(i)
             self.weekday_selected_images[dkey] = []
 
-            outer = ctk.CTkFrame(parent)
+            outer = ctk.CTkFrame(scroll)
             outer.pack(fill='x', padx=20, pady=8)
 
             # Encabezado y toggle
@@ -492,9 +496,9 @@ class WallpaperChangerGUI:
             self.weekday_summary_labels[dkey] = ctk.CTkLabel(actions, text="0 imágenes")
             self.weekday_summary_labels[dkey].pack(side='left')
 
-        # Botón guardar
+        # Botón guardar al final (puede quedar dentro del scroll)
         ctk.CTkButton(
-            parent,
+            scroll,
             text="💾 Guardar Configuración de Días",
             command=self.save_weekday_config,
             height=40,

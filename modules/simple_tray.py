@@ -10,6 +10,7 @@ from typing import Callable
 try:
     import pystray
     from PIL import Image as PILImage
+    from PIL import ImageDraw
     PYSTRAY_AVAILABLE = True
 except ImportError:
     PYSTRAY_AVAILABLE = False
@@ -37,14 +38,21 @@ class SimpleTrayManager:
                 print(f"[TRAY-SIMPLE] Ejecutando como script. Base: {base_path}")
 
             candidates = [
-                os.path.join(base_path, 'assets', 'icon.ico'),
                 os.path.join(base_path, 'assets', 'icon_32.png'),
                 os.path.join(base_path, 'assets', 'icon.png'),
+                os.path.join(base_path, 'assets', 'icon.ico'),
             ]
             for icon_path in candidates:
                 print(f"[TRAY-SIMPLE] Probando icono: {icon_path}")
                 if os.path.exists(icon_path):
-                    return PILImage.open(icon_path)
+                    img = PILImage.open(icon_path)
+                    try:
+                        img = img.convert('RGBA')
+                        if img.size != (32, 32):
+                            img = img.resize((32, 32), resample=0)
+                    except Exception:
+                        pass
+                    return img
         except Exception as e:
             print(f"[TRAY-SIMPLE] Error cargando icono: {e}")
 
@@ -63,9 +71,47 @@ class SimpleTrayManager:
         try:
             image = self.create_simple_icon()
             
+            # Acciones adicionales
+            def abrir_config(icon=None, item=None):
+                try:
+                    import sys
+                    base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.dirname(__file__))) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.dirname(__file__))
+                    cfg = os.path.join(base_path, 'config.json')
+                    if os.path.exists(cfg):
+                        os.startfile(cfg)
+                    else:
+                        os.startfile(base_path)
+                except Exception:
+                    pass
+
+            def habilitar_inicio(icon=None, item=None):
+                try:
+                    from .startup_manager import StartupManager
+                    ok, msg = StartupManager.enable()
+                    try:
+                        self.notify("Inicio automático", msg)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
+            def deshabilitar_inicio(icon=None, item=None):
+                try:
+                    from .startup_manager import StartupManager
+                    ok, msg = StartupManager.disable()
+                    try:
+                        self.notify("Inicio automático", msg)
+                    except Exception:
+                        pass
+                except Exception:
+                    pass
+
             menu = pystray.Menu(
                 pystray.MenuItem("Mostrar Ventana", self.on_show, default=True),
                 pystray.MenuItem("Cambiar Fondo Ahora", self.change_wallpaper),
+                pystray.MenuItem("Abrir Configuración", abrir_config),
+                pystray.MenuItem("Habilitar inicio automático", habilitar_inicio),
+                pystray.MenuItem("Deshabilitar inicio automático", deshabilitar_inicio),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem("Salir", self.on_quit)
             )
@@ -200,10 +246,23 @@ class SimpleTrayManager:
                 pass
     
     def stop(self):
-        """Detiene el icono"""
-        if self.icon and self.running:
-            try:
-                self.icon.stop()
-                self.running = False
-            except:
-                pass
+        """Detiene el icono y espera que el hilo termine"""
+        try:
+            if self.icon:
+                try:
+                    self.icon.stop()
+                except Exception:
+                    pass
+            # Marcar estado
+            self.running = False
+            # Esperar a que el hilo de icono termine si existe
+            if hasattr(self, 'thread') and self.thread:
+                try:
+                    if self.thread.is_alive():
+                        self.thread.join(timeout=2)
+                except Exception:
+                    pass
+            # Liberar referencia al icono
+            self.icon = None
+        except Exception:
+            pass

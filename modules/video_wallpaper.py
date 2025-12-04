@@ -629,11 +629,23 @@ if __name__ == "__main__":
             # Detener proceso de video si existe (método antiguo)
             if self.current_video_process:
                 try:
+                    # Solicitar terminación y esperar un breve tiempo
                     self.current_video_process.terminate()
-                    self.current_video_process = None
+                    try:
+                        self.current_video_process.wait(timeout=2)
+                    except Exception:
+                        pass
+                    # Si sigue vivo, forzar cierre
+                    if self.current_video_process.poll() is None:
+                        try:
+                            self.current_video_process.kill()
+                        except Exception:
+                            pass
                     print("✅ Proceso de video terminado")
-                except:
+                except Exception:
                     pass
+                finally:
+                    self.current_video_process = None
             
             # Restaurar fondo sólido
             self._restore_default_wallpaper()
